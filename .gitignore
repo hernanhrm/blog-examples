@@ -30,3 +30,7 @@ migrations
 # Archivos del IDE
 .idea/
 .vscode/
+
+*/.env
+
+/private-files/private-files
