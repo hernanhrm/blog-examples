@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -40,19 +39,14 @@ func NewS3Service(conf Config) (Service, error) {
 }
 
 // Upload take an io.Reader and uploads it to aws s3
-func (s Service) Upload(file io.Reader, contentType, path string, isPublic bool) error {
+func (s Service) Upload(fileBytes []byte, contentType, path string, isPublic bool) error {
 	permission := PublicRead
 	if !isPublic {
 		permission = AuthenticatedRead
 	}
 
-	fileBytes, err := ioutil.ReadAll(file)
-	if err != nil {
-		return fmt.Errorf("s3.Upload(): %v", err)
-	}
-
 	service := s3.New(s.Session)
-	_, err = service.PutObject(&s3.PutObjectInput{
+	_, err := service.PutObject(&s3.PutObjectInput{
 		Bucket:      aws.String(s.Bucket),
 		Key:         aws.String(path),
 		Body:        bytes.NewReader(fileBytes),

@@ -49,7 +49,7 @@ func (u FileManager) Upload(m RequestUploaderImage) (string, error) {
 	}
 
 	path := filepath.Join(m.Folder, fileName)
-	if err := u.service.Upload(fileReader, contentType, path, m.IsPublic); err != nil {
+	if err := u.service.Upload(file, contentType, path, m.IsPublic); err != nil {
 		return "", fmt.Errorf("filemanager.Upload(): %w", err)
 	}
 
