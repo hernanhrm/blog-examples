@@ -17,6 +17,7 @@ import (
 const (
 	PublicRead        = "public-read"
 	AuthenticatedRead = "authenticated-read"
+	Private           = "private"
 )
 
 // Service is the use case of the storage s3 service
@@ -42,7 +43,7 @@ func NewS3Service(conf Config) (Service, error) {
 func (s Service) Upload(fileBytes []byte, contentType, path string, isPublic bool) error {
 	permission := PublicRead
 	if !isPublic {
-		permission = AuthenticatedRead
+		permission = Private
 	}
 
 	service := s3.New(s.Session)

@@ -14,6 +14,7 @@ var allowedImages = map[string]string{
 	MIMEImageJPG:       ".jpg",
 	MIMEImageJPEG:      ".jpg",
 	MIMEApplicationPDF: ".pdf",
+	MIMETextPlain:      ".csv",
 }
 
 type FileManager struct {

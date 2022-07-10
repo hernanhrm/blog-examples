@@ -7,6 +7,7 @@ const (
 	MIMEImageJPG       = "image/jpg"
 	MIMEImagePNG       = "image/png"
 	MIMEApplicationPDF = "application/pdf"
+	MIMETextPlain      = "text/plain"
 )
 
 // RequestUploaderImage is the struct for file upload
