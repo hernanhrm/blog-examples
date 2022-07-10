@@ -31,6 +31,7 @@ func main() {
 	apiGroup := e.Group("api/v1/filemanager")
 	apiGroup.POST("", handler.Upload)
 	apiGroup.GET("", handler.GetFile)
+	apiGroup.GET("/sign", handler.Presign)
 
 	log.Fatal(e.Start(":8080"))
 }

@@ -46,3 +46,14 @@ func (h handler) GetFile(c echo.Context) error {
 
 	return c.Blob(http.StatusOK, fileDetail.ContentType, fileDetail.FileBytes)
 }
+
+func (h handler) Presign(c echo.Context) error {
+	signedURL, err := h.useCase.Presign(c.QueryParam("filepath"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err)
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{
+		"signed_url": signedURL,
+	})
+}

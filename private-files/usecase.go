@@ -66,6 +66,15 @@ func (u FileManager) GetFile(filepath string) (GetFileResponse, error) {
 	return response, nil
 }
 
+func (u FileManager) Presign(key string) (string, error) {
+	signedURL, err := u.service.Presign(key)
+	if err != nil {
+		return "", fmt.Errorf("filemanager.Presign(): %w", err)
+	}
+
+	return signedURL, nil
+}
+
 func getFileName(extension string) (string, error) {
 	return uuid.NewV4().String() + extension, nil
 }

@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"math"
+	"net/http"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
+	v4 "github.com/aws/aws-sdk-go/aws/signer/v4"
 	"github.com/aws/aws-sdk-go/service/s3"
 )
 
@@ -101,18 +104,20 @@ func (s Service) GetFile(filename string) (GetFileResponse, error) {
 
 // Presign signs a key object with an expiry time
 func (s Service) Presign(key string) (string, error) {
-	service := s3.New(s.Session)
+	signTime := time.Now()
+	minutes := int(math.Floor(float64(signTime.Minute())/10) * 10)
+	signTime = time.Date(signTime.Year(), signTime.Month(), signTime.Day(), signTime.Hour(), minutes, 0, 0, signTime.Location())
 
-	// Here we just get a request with the headers needed to sign the url
-	req, _ := service.GetObjectRequest(&s3.GetObjectInput{
-		Bucket: aws.String(s.Bucket),
-		Key:    aws.String(key),
-	})
-
-	signedURL, err := req.Presign(time.Minute)
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("https://%s.s3.amazonaws.com/%s", s.Bucket, key), nil)
 	if err != nil {
-		return "", fmt.Errorf("s3.SignKey(): %v", err)
+		return "", fmt.Errorf("s3.Presign.http.NewRequest(): %w", err)
+	}
+	signerService := v4.NewSigner(s.Session.Config.Credentials)
+
+	_, err = signerService.Presign(req, nil, "s3", *s.Session.Config.Region, time.Minute*10, signTime)
+	if err != nil {
+		return "", fmt.Errorf("s3.Presign.v4.NewSigner(): %w", err)
 	}
 
-	return signedURL, nil
+	return req.URL.String(), nil
 }
