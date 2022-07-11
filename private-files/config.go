@@ -1,5 +1,6 @@
 package main
 
+// Config contains the configuration read from the .env file
 type Config struct {
 	S3AccessKey    string `json:"s3_access_key"`
 	S3SecretKey    string `json:"s3_secret_key"`

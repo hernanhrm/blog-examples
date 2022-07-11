@@ -28,10 +28,21 @@ func main() {
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 
+	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins: []string{"*"},
+	}))
+
+	// these routes should be protected by a middleware that checks
+	// the Authentication and Authorization of the user to access the resources
+
 	apiGroup := e.Group("api/v1/filemanager")
 	apiGroup.POST("", handler.Upload)
+
 	apiGroup.GET("", handler.GetFile)
 	apiGroup.GET("/sign", handler.Presign)
+
+	employeeGroup := e.Group("api/v1/employees")
+	employeeGroup.GET("", handler.GetEmployees)
 
 	log.Fatal(e.Start(":8080"))
 }

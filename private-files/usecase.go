@@ -14,7 +14,6 @@ var allowedImages = map[string]string{
 	MIMEImageJPG:       ".jpg",
 	MIMEImageJPEG:      ".jpg",
 	MIMEApplicationPDF: ".pdf",
-	MIMETextPlain:      ".csv",
 }
 
 type FileManager struct {
@@ -64,6 +63,22 @@ func (u FileManager) GetFile(filepath string) (GetFileResponse, error) {
 	}
 
 	return response, nil
+}
+
+// GetEmployees returns a list of employees with a pre-signed URL to their profile picture
+// to make the example easier to follow, I have a mock data with a list of employees,
+// so we don't need to use a database
+func (u FileManager) GetEmployees() ([]Employee, error) {
+	for i, _ := range employees {
+		preSignedURL, err := u.service.Presign(employees[i].Picture)
+		if err != nil {
+			return nil, fmt.Errorf("filemanager.GetEmployees(): %w", err)
+		}
+
+		employees[i].PreSignedPicture = preSignedURL
+	}
+
+	return employees, nil
 }
 
 func (u FileManager) Presign(key string) (string, error) {

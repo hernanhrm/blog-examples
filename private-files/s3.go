@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"math"
 	"net/http"
 	"time"
 
@@ -18,15 +17,18 @@ import (
 
 // Permissions
 const (
-	PublicRead        = "public-read"
-	AuthenticatedRead = "authenticated-read"
-	Private           = "private"
+	// PublicRead is used to set the permission of a file to public read
+	PublicRead = "public-read"
+	// Private is used to set the permission of a file to private
+	Private = "private"
 )
 
 // Service is the use case of the storage s3 service
 type Service struct {
 	Bucket  string
 	Session *session.Session
+	S3      *s3.S3
+	Signer  *v4.Signer
 }
 
 // NewS3Service returns a new s3 service
@@ -39,18 +41,19 @@ func NewS3Service(conf Config) (Service, error) {
 	return Service{
 		Bucket:  conf.S3BucketName,
 		Session: awsSession,
+		S3:      s3.New(awsSession),
+		Signer:  v4.NewSigner(awsSession.Config.Credentials),
 	}, nil
 }
 
-// Upload take an io.Reader and uploads it to aws s3
+// Upload takes a file and uploads it to the s3 bucket
 func (s Service) Upload(fileBytes []byte, contentType, path string, isPublic bool) error {
 	permission := PublicRead
 	if !isPublic {
 		permission = Private
 	}
 
-	service := s3.New(s.Session)
-	_, err := service.PutObject(&s3.PutObjectInput{
+	_, err := s.S3.PutObject(&s3.PutObjectInput{
 		Bucket:      aws.String(s.Bucket),
 		Key:         aws.String(path),
 		Body:        bytes.NewReader(fileBytes),
@@ -64,30 +67,29 @@ func (s Service) Upload(fileBytes []byte, contentType, path string, isPublic boo
 	return nil
 }
 
-// GetFile returns a file bytes
+// GetFile returns a file from the s3 bucket
 func (s Service) GetFile(filename string) (GetFileResponse, error) {
 	input := &s3.GetObjectInput{
 		Bucket: aws.String(s.Bucket),
 		Key:    aws.String(filename),
 	}
 
-	service := s3.New(s.Session)
-	result, err := service.GetObject(input)
+	result, err := s.S3.GetObject(input)
 	if err != nil {
 		if aswErr, ok := err.(awserr.Error); ok {
 			switch aswErr.Code() {
 			case s3.ErrCodeNoSuchKey:
-				return GetFileResponse{}, fmt.Errorf("s3.GetFile.service.GetFile(): file does not exists")
+				return GetFileResponse{}, fmt.Errorf("s3.GetFile: file does not exists")
 			default:
-				return GetFileResponse{}, fmt.Errorf("s3.GetFile.service.GetFile(): %w", err)
+				return GetFileResponse{}, fmt.Errorf("s3.GetFile: %w", err)
 			}
 		}
 
-		return GetFileResponse{}, fmt.Errorf("s3.GetFile.service.GetFile(): %w", err)
+		return GetFileResponse{}, fmt.Errorf("s3.GetFile: %w", err)
 	}
-
 	defer result.Body.Close()
 
+	// we need the file content type and bytes to return the file with echo (web framework)
 	m := GetFileResponse{}
 	fileBytes, err := io.ReadAll(result.Body)
 	if err != nil {
@@ -104,20 +106,36 @@ func (s Service) GetFile(filename string) (GetFileResponse, error) {
 
 // Presign signs a key object with an expiry time
 func (s Service) Presign(key string) (string, error) {
-	signTime := time.Now()
-	minutes := int(math.Floor(float64(signTime.Minute())/10) * 10)
-	signTime = time.Date(signTime.Year(), signTime.Month(), signTime.Day(), signTime.Hour(), minutes, 0, 0, signTime.Location())
-
 	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("https://%s.s3.amazonaws.com/%s", s.Bucket, key), nil)
 	if err != nil {
 		return "", fmt.Errorf("s3.Presign.http.NewRequest(): %w", err)
 	}
-	signerService := v4.NewSigner(s.Session.Config.Credentials)
 
-	_, err = signerService.Presign(req, nil, "s3", *s.Session.Config.Region, time.Minute*10, signTime)
+	// we sign the request with the signTime and a time expiration of 1 day
+	_, err = s.Signer.Presign(req, nil, "s3", *s.Session.Config.Region, time.Hour*24, getSignTime())
 	if err != nil {
 		return "", fmt.Errorf("s3.Presign.v4.NewSigner(): %w", err)
 	}
 
 	return req.URL.String(), nil
+}
+
+func (s Service) PresignV2(key string) (string, error) {
+	req, _ := s.S3.GetObjectRequest(&s3.GetObjectInput{
+		Bucket: aws.String(s.Bucket),
+		Key:    aws.String(key),
+	})
+
+	signedURL, err := req.Presign(time.Minute)
+	if err != nil {
+		return "", fmt.Errorf("s3.SignKey(): %v", err)
+	}
+
+	return signedURL, nil
+}
+
+// getSignTime returns a truncated time to day precision
+// with this precision, will get the same signature during the day
+func getSignTime() time.Time {
+	return time.Now().Truncate(time.Hour * 24).UTC()
 }
